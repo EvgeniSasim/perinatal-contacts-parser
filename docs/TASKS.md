@@ -61,7 +61,7 @@
 | D4 | Деплой: secrets, compose/prod, DNS/HTTPS | qa_deploy | blocked | Docker daemon / нет VPS |
 | D5 | Smoke на проде: filter, search, export | qa_deploy | done | локальный uvicorn smoke |
 | D6 | Документация интеграции WP + API keys | qa_deploy | done | `docs/INTEGRATION.md` |
-| D7 | Tag release `v0.1.0` на GitHub | qa_deploy | in_progress | release notes |
+| D7 | Tag release `v0.1.0` на GitHub | qa_deploy | done | https://github.com/EvgeniSasim/perinatal-contacts-parser/releases/tag/v0.1.0 |
 
 ---
 
