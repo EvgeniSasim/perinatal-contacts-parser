@@ -79,12 +79,32 @@ def host_allowed(url: str) -> bool:
     return any(host == a or host.endswith("." + a) for a in allow)
 
 
-def http_client(timeout: float = 30.0) -> httpx.Client:
+def http_client(timeout: float = 30.0, *, verify: bool = True) -> httpx.Client:
+    """HTTP-клиент с ботовым User-Agent.
+
+    `verify=False` нужен только как fallback для сайтов учреждений: многие используют
+    сертификаты Минцифры РФ, которых нет в хранилище certifi, и без fallback такой
+    домен неотличим от мёртвого.
+    """
     return httpx.Client(
         timeout=timeout,
         follow_redirects=True,
+        verify=verify,
         headers={"User-Agent": BOT_UA, "Accept-Language": "ru"},
     )
+
+
+def classify_network_error(exc: Exception) -> str:
+    message = str(exc).lower()
+    if "certificate" in message or "ssl" in message:
+        return "ssl_error"
+    if isinstance(exc, httpx.TimeoutException) or "timed out" in message:
+        return "timeout"
+    if "name or service not known" in message or "nodename nor servname" in message:
+        return "dns_error"
+    if "connection refused" in message:
+        return "refused"
+    return "network_error"
 
 
 def rate_sleep(seconds: float | None = None) -> None:

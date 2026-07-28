@@ -110,6 +110,147 @@ def test_crawl_2gis_requires_key(client):
     assert "DGIS_API_KEY" in (body.get("error") or "")
 
 
+def test_persons_seed_is_loaded_on_startup(client):
+    """Снапшот персон должен восстанавливаться, иначе свежий деплой теряет должности."""
+    r = client.get("/api/v1/admin/persons", params={"role": "chief", "limit": 5}, headers={"X-API-Key": "test-key"})
+    assert r.status_code == 200
+    assert r.json()["total"] >= 1
+
+
+def test_persons_crud_and_field_sync(client):
+    inst = client.get("/api/v1/institutions?page_size=1").json()["items"][0]
+    person = _add_person(inst["id"], "Иванов Иван Иванович", "chief", "high")
+
+    r = client.get(f"/api/v1/institutions/{inst['id']}/persons")
+    assert r.status_code == 200
+    assert any(p["full_name"] == "Иванов Иван Иванович" for p in r.json()["items"])
+
+    r = client.patch(
+        f"/api/v1/admin/persons/{person}",
+        json={"full_name": "Иванова Мария Петровна", "verified_manually": True},
+        headers={"X-API-Key": "test-key"},
+    )
+    assert r.status_code == 200
+    assert r.json()["confidence"] == "high"
+
+    detail = client.get(f"/api/v1/institutions/{inst['id']}").json()
+    assert detail["chief_physician"] == "Иванова Мария Петровна"
+
+    r = client.delete(f"/api/v1/admin/persons/{person}", headers={"X-API-Key": "test-key"})
+    assert r.status_code == 204
+    detail = client.get(f"/api/v1/institutions/{inst['id']}").json()
+    assert detail["chief_physician"] is None
+
+
+def test_persons_low_confidence_hidden_by_default(client):
+    inst = client.get("/api/v1/institutions?page_size=1").json()["items"][0]
+    _add_person(inst["id"], "Слабый Кандидат Иванович", "chief", "low")
+    items = client.get(f"/api/v1/institutions/{inst['id']}/persons").json()["items"]
+    assert not any(p["confidence"] == "low" for p in items)
+    items = client.get(
+        f"/api/v1/institutions/{inst['id']}/persons", params={"min_confidence": "low"}
+    ).json()["items"]
+    assert any(p["confidence"] == "low" for p in items)
+
+
+def test_persons_endpoint_requires_admin_key(client):
+    assert client.get("/api/v1/admin/persons").status_code == 401
+    assert client.get("/api/v1/admin/persons", headers={"X-API-Key": "test-key"}).status_code == 200
+
+
+def test_completeness_metrics(client):
+    r = client.get("/api/v1/admin/metrics/completeness", headers={"X-API-Key": "test-key"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total"] > 0
+    assert "chief_physician" in data["fields"]
+    assert data["fields"]["address"]["pct"] > 50
+    assert isinstance(data["by_type"], list) and data["by_type"]
+
+
+def test_has_chief_filter(client):
+    inst = client.get("/api/v1/institutions?page_size=1").json()["items"][0]
+    client.patch(
+        f"/api/v1/admin/institutions/{inst['id']}",
+        json={"chief_physician": "Тестов Тест Тестович"},
+        headers={"X-API-Key": "test-key"},
+    )
+    with_chief = client.get("/api/v1/institutions", params={"has_chief": True, "page_size": 100}).json()
+    assert with_chief["total"] >= 1
+    assert all(i["chief_physician"] for i in with_chief["items"])
+    without = client.get("/api/v1/institutions", params={"has_chief": False, "page_size": 100}).json()
+    assert all(not i["chief_physician"] for i in without["items"])
+
+
+def test_mailing_preview_personalizes(client):
+    inst = client.get("/api/v1/institutions", params={"has_email": True, "page_size": 1}).json()["items"][0]
+    client.patch(
+        f"/api/v1/admin/institutions/{inst['id']}",
+        json={"chief_physician": "Тестов Тест Тестович"},
+        headers={"X-API-Key": "test-key"},
+    )
+    r = client.post(
+        "/api/v1/admin/mailings/preview",
+        json={
+            "subject": "Приглашение для {{name}}",
+            "body_html": "<p>Уважаемый(ая) {{chief}}</p>",
+            "filter": {"has_email": True},
+        },
+        headers={"X-API-Key": "test-key"},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total_recipients"] > 0
+    assert data["samples"]
+    assert all("{{" not in s["body_html"] for s in data["samples"])
+
+
+def test_enrich_job_is_recorded(client):
+    r = client.post(
+        "/api/v1/admin/jobs/enrich",
+        json={"limit": 1, "region": "НетТакогоРегиона"},
+        headers={"X-API-Key": "test-key"},
+    )
+    assert r.status_code == 202
+    job = r.json()
+    assert job["kind"] == "enrich"
+    assert job["status"] == "done"
+    assert job["result_json"]["processed"] == 0
+    assert client.get(f"/api/v1/admin/jobs/{job['id']}", headers={"X-API-Key": "test-key"}).status_code == 200
+
+
+def test_export_has_persons_sheet(client):
+    from openpyxl import load_workbook
+
+    inst = client.get("/api/v1/institutions", params={"region": "Москва", "page_size": 1}).json()["items"][0]
+    _add_person(inst["id"], "Экспортов Экспорт Экспортович", "chief", "high")
+    r = client.post("/api/v1/admin/export", json={"region": "Москва"}, headers={"X-API-Key": "test-key"})
+    path = r.json()["result_json"]["path"]
+    wb = load_workbook(path)
+    assert "persons" in wb.sheetnames
+    values = [c.value for row in wb["persons"].iter_rows() for c in row]
+    assert "Экспортов Экспорт Экспортович" in values
+
+
+def _add_person(institution_id: str, full_name: str, role: str, confidence: str) -> str:
+    from app.db import SessionLocal
+    from app.models import InstitutionPerson
+    from app.services.collectors.person_extractor import normalize_person_name
+
+    with SessionLocal() as db:
+        person = InstitutionPerson(
+            institution_id=institution_id,
+            full_name=full_name,
+            full_name_norm=normalize_person_name(full_name),
+            role=role,
+            confidence=confidence,
+            source_url="https://example.com/rukovodstvo",
+        )
+        db.add(person)
+        db.commit()
+        return person.id
+
+
 def test_classify_and_sites_registry():
     from app.services.collectors.base import classify_type
     from app.services.collectors.site_registry import load_registry

@@ -52,6 +52,10 @@ paths:
           name: has_phone
           schema: { type: boolean }
         - in: query
+          name: has_chief
+          description: true — только с известным главврачом, false — только без него
+          schema: { type: boolean }
+        - in: query
           name: nmic_ref
           schema: { type: string }
         - in: query
@@ -77,6 +81,32 @@ paths:
       responses:
         "200":
           description: OK
+        "404":
+          description: Not found
+  /institutions/{id}/persons:
+    get:
+      summary: Персоны учреждения (руководство, зав. отделениями)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: min_confidence
+          description: Порог достоверности; по умолчанию low скрыт
+          schema: { type: string, enum: [high, medium, low], default: medium }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Person" }
+                  total: { type: integer }
         "404":
           description: Not found
   /admin/institutions:
@@ -106,6 +136,95 @@ paths:
       responses:
         "202":
           description: Accepted
+  /admin/jobs/enrich:
+    post:
+      summary: Обогащение ФИО руководства и email с сайтов учреждений
+      security: [{ ApiKeyAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit: { type: integer, default: 25, minimum: 1, maximum: 500 }
+                only_missing_chief: { type: boolean, default: true }
+                region: { type: string, nullable: true }
+                type: { type: string, nullable: true }
+                with_site_only:
+                  type: boolean
+                  default: false
+                  description: только учреждения с уже известным сайтом
+                force:
+                  type: boolean
+                  default: false
+                  description: игнорировать недавние неудачные попытки
+      responses:
+        "202":
+          description: Job создан и выполнен синхронно
+  /admin/jobs/{job_id}:
+    get:
+      summary: Статус job любого вида
+      security: [{ ApiKeyAuth: [] }]
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not found
+  /admin/persons:
+    get:
+      summary: Очередь персон для ручной проверки
+      security: [{ ApiKeyAuth: [] }]
+      parameters:
+        - in: query
+          name: institution_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: role
+          schema: { type: string, enum: [chief, deputy, pathology_head, head, other] }
+        - in: query
+          name: confidence
+          schema: { type: string, enum: [high, medium, low] }
+        - in: query
+          name: unverified_only
+          schema: { type: boolean, default: false }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 100, maximum: 500 }
+      responses:
+        "200":
+          description: OK
+  /admin/persons/{person_id}:
+    patch:
+      summary: Правка персоны; verified_manually защищает от перезаписи парсером
+      security: [{ ApiKeyAuth: [] }]
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not found
+    delete:
+      summary: Удалить персону и пересчитать поля учреждения
+      security: [{ ApiKeyAuth: [] }]
+      responses:
+        "204":
+          description: Deleted
+  /admin/metrics/completeness:
+    get:
+      summary: Метрики полноты данных
+      security: [{ ApiKeyAuth: [] }]
+      responses:
+        "200":
+          description: OK
+  /admin/mailings/preview:
+    post:
+      summary: Предпросмотр рассылки с подстановками
+      description: |
+        Подстановки в subject и body_html: {{name}}, {{city}}, {{region}}, {{chief}}, {{address}}.
+        Если ФИО главврача неизвестно, {{chief}} превращается в «коллеги».
+      security: [{ ApiKeyAuth: [] }]
+      responses:
+        "200":
+          description: OK
   /admin/export:
     post:
       summary: Excel export by filter
@@ -163,3 +282,20 @@ components:
         source_url: { type: string }
         verification_status: { type: string }
         updated_at: { type: string, format: date-time }
+    Person:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        institution_id: { type: string, format: uuid }
+        full_name: { type: string }
+        role: { type: string, enum: [chief, deputy, pathology_head, head, other] }
+        position_raw: { type: string, nullable: true }
+        department: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        confidence:
+          type: string
+          enum: [high, medium, low]
+          description: high — ФИО и должность в одном блоке на странице руководства
+        source_url: { type: string }
+        verified_manually: { type: boolean }

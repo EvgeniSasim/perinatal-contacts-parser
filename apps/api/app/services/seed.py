@@ -4,7 +4,8 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Institution
+from app.models import Institution, InstitutionPerson
+from app.services.collectors.person_extractor import normalize_person_name
 from app.services.normalize import normalize_email, normalize_name, normalize_phone, split_multi
 
 
@@ -82,6 +83,58 @@ def load_seed_csv(db: Session, path: str | Path) -> int:
                 "verification_status": (raw.get("verification_status") or "pending").strip(),
             }
             upsert_institution(db, data)
+            count += 1
+    db.commit()
+    return count
+
+
+def load_persons_csv(db: Session, path: str | Path) -> int:
+    """Восстановить `institution_persons` из снапшота.
+
+    Без этого свежий деплой видит только денормализованные `chief_physician` /
+    `pathology_head`, но теряет должности, отделения и ссылки на источник.
+    """
+    csv_path = Path(path)
+    if not csv_path.is_file():
+        return 0
+    by_key = {
+        (normalize_name(inst.name), inst.city): inst
+        for inst in db.scalars(select(Institution)).all()
+    }
+    count = 0
+    with csv_path.open(encoding="utf-8") as f:
+        for raw in csv.DictReader(f):
+            inst = by_key.get((normalize_name(raw["institution_name"]), raw["city"].strip()))
+            if inst is None:
+                continue
+            full_name = raw["full_name"].strip()
+            name_norm = normalize_person_name(full_name)
+            role = raw["role"].strip()
+            existing = db.scalar(
+                select(InstitutionPerson).where(
+                    InstitutionPerson.institution_id == inst.id,
+                    InstitutionPerson.full_name_norm == name_norm,
+                    InstitutionPerson.role == role,
+                )
+            )
+            if existing is not None:
+                continue
+            db.add(
+                InstitutionPerson(
+                    institution_id=inst.id,
+                    full_name=full_name,
+                    full_name_norm=name_norm,
+                    role=role,
+                    position_raw=(raw.get("position_raw") or "").strip() or None,
+                    department=(raw.get("department") or "").strip() or None,
+                    phone=(raw.get("phone") or "").strip() or None,
+                    email=(raw.get("email") or "").strip() or None,
+                    confidence=(raw.get("confidence") or "low").strip(),
+                    source_url=raw["source_url"].strip(),
+                    verified_manually=(raw.get("verified_manually") or "").strip() == "да",
+                )
+            )
+            db.flush()
             count += 1
     db.commit()
     return count

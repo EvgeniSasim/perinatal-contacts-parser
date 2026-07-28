@@ -2,13 +2,16 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.deps import require_admin_api_key
-from app.models import Institution, Job, MailCampaign
+from app.models import Institution, InstitutionPerson, Job, MailCampaign
 from app.schemas import (
+    CompletenessOut,
     CrawlRequest,
+    EnrichRequest,
     ExportRequest,
     InstitutionCreate,
     InstitutionOut,
@@ -16,11 +19,17 @@ from app.schemas import (
     JobOut,
     MailCampaignOut,
     MailingRequest,
+    PersonListOut,
+    PersonOut,
+    PersonUpdate,
 )
 from app.services.collectors.html_generic import fetch_and_parse
+from app.services.collectors.person_extractor import normalize_person_name
 from app.services.crawl_runner import run_crawl
+from app.services.enrich import run_enrichment
 from app.services.export import run_export_job
-from app.services.mailing import run_mailing
+from app.services.mailing import preview_mailing, run_mailing
+from app.services.metrics import build_completeness
 from app.services.normalize import normalize_email, normalize_name, normalize_phone
 from app.services.query import to_out
 from app.services.seed import upsert_institution
@@ -110,6 +119,117 @@ def crawl(body: CrawlRequest, db: Session = Depends(get_db)) -> JobOut:
     return JobOut.model_validate(job)
 
 
+@router.post("/jobs/enrich", response_model=JobOut, status_code=202)
+def enrich(body: EnrichRequest, db: Session = Depends(get_db)) -> JobOut:
+    job = Job(kind="enrich", status="queued", payload_json=body.model_dump())
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    job.status = "running"
+    db.commit()
+    try:
+        job.result_json = run_enrichment(
+            db,
+            limit=body.limit,
+            only_missing_chief=body.only_missing_chief,
+            region=body.region,
+            type_=body.type,
+            with_site_only=body.with_site_only,
+            without_site_only=body.without_site_only,
+            force=body.force,
+        )
+        job.status = "done"
+    except Exception as exc:  # noqa: BLE001
+        job.status = "failed"
+        job.error = str(exc)
+    db.commit()
+    db.refresh(job)
+    return JobOut.model_validate(job)
+
+
+@router.get("/jobs/{job_id}", response_model=JobOut)
+def get_job(job_id: str, db: Session = Depends(get_db)) -> JobOut:
+    job = db.get(Job, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Not found")
+    return JobOut.model_validate(job)
+
+
+@router.get("/persons", response_model=PersonListOut)
+def list_persons(
+    institution_id: str | None = None,
+    role: str | None = None,
+    confidence: str | None = None,
+    unverified_only: bool = False,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+) -> PersonListOut:
+    stmt = select(InstitutionPerson)
+    if institution_id:
+        stmt = stmt.where(InstitutionPerson.institution_id == institution_id)
+    if role:
+        stmt = stmt.where(InstitutionPerson.role == role)
+    if confidence:
+        stmt = stmt.where(InstitutionPerson.confidence == confidence)
+    if unverified_only:
+        stmt = stmt.where(InstitutionPerson.verified_manually.is_(False))
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    rows = db.scalars(stmt.order_by(InstitutionPerson.updated_at.desc()).limit(min(limit, 500))).all()
+    return PersonListOut(items=[PersonOut.model_validate(r) for r in rows], total=total)
+
+
+@router.patch("/persons/{person_id}", response_model=PersonOut)
+def update_person(person_id: str, body: PersonUpdate, db: Session = Depends(get_db)) -> PersonOut:
+    person = db.get(InstitutionPerson, person_id)
+    if not person:
+        raise HTTPException(status_code=404, detail="Not found")
+    data = body.model_dump(exclude_unset=True)
+    if data.get("full_name"):
+        person.full_name_norm = normalize_person_name(data["full_name"])
+    for key, value in data.items():
+        setattr(person, key, value)
+    # ручная правка сразу поднимает достоверность и защищает от перезаписи парсером
+    if body.verified_manually:
+        person.confidence = "high"
+    db.commit()
+    db.refresh(person)
+    _sync_institution_fields(db, person.institution_id)
+    return PersonOut.model_validate(person)
+
+
+@router.delete("/persons/{person_id}", status_code=204)
+def delete_person(person_id: str, db: Session = Depends(get_db)) -> None:
+    person = db.get(InstitutionPerson, person_id)
+    if not person:
+        raise HTTPException(status_code=404, detail="Not found")
+    institution_id = person.institution_id
+    db.delete(person)
+    db.commit()
+    _sync_institution_fields(db, institution_id)
+
+
+def _sync_institution_fields(db: Session, institution_id: str) -> None:
+    """Пересчитать chief_physician / pathology_head после правок персон."""
+    inst = db.get(Institution, institution_id)
+    if not inst:
+        return
+    persons = db.scalars(
+        select(InstitutionPerson).where(InstitutionPerson.institution_id == institution_id)
+    ).all()
+    for field, role in (("chief_physician", "chief"), ("pathology_head", "pathology_head")):
+        candidates = sorted(
+            (p for p in persons if p.role == role and p.confidence in {"high", "medium"}),
+            key=lambda p: (0 if p.verified_manually else 1, 0 if p.confidence == "high" else 1),
+        )
+        setattr(inst, field, candidates[0].full_name if candidates else None)
+    db.commit()
+
+
+@router.get("/metrics/completeness", response_model=CompletenessOut)
+def completeness(db: Session = Depends(get_db)) -> CompletenessOut:
+    return CompletenessOut(**build_completeness(db))
+
+
 @router.post("/export", response_model=JobOut, status_code=202)
 def export_excel(body: ExportRequest, db: Session = Depends(get_db)) -> JobOut:
     job = Job(kind="export", status="queued", payload_json=body.model_dump())
@@ -159,6 +279,11 @@ def create_mailing(body: MailingRequest, db: Session = Depends(get_db)) -> MailC
     run_mailing(db, campaign)
     db.refresh(campaign)
     return MailCampaignOut.model_validate(campaign)
+
+
+@router.post("/mailings/preview")
+def preview(body: MailingRequest, db: Session = Depends(get_db)) -> dict:
+    return preview_mailing(db, body.subject, body.body_html, body.filter.model_dump())
 
 
 @router.get("/mailings/{campaign_id}", response_model=MailCampaignOut)

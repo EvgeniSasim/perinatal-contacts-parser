@@ -1,0 +1,6 @@
+line-length = 120
+
+[lint.per-file-ignores]
+# CLI-скрипты и тесты правят sys.path до импорта app.*
+"scripts/*.py" = ["E402"]
+"tests/*.py" = ["E402"]

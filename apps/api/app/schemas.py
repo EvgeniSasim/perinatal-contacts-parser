@@ -69,6 +69,7 @@ class ExportRequest(BaseModel):
     city: str | None = None
     has_email: bool | None = None
     has_phone: bool | None = None
+    has_chief: bool | None = None
     nmic_ref: str | None = None
 
 
@@ -83,6 +84,56 @@ class CrawlRequest(BaseModel):
     source: str = "all_free"
     url: str | None = None
     cities: list[str] | None = None
+
+
+class EnrichRequest(BaseModel):
+    limit: int = Field(default=25, ge=1, le=500)
+    only_missing_chief: bool = True
+    region: str | None = None
+    type: str | None = None
+    with_site_only: bool = False
+    without_site_only: bool = False
+    force: bool = False
+
+
+class PersonOut(BaseModel):
+    id: str
+    institution_id: str
+    full_name: str
+    role: str
+    position_raw: str | None = None
+    department: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    confidence: str
+    source_url: str
+    verified_manually: bool
+
+    model_config = {"from_attributes": True}
+
+
+class PersonListOut(BaseModel):
+    items: list[PersonOut]
+    total: int
+
+
+class PersonUpdate(BaseModel):
+    full_name: str | None = None
+    role: str | None = None
+    position_raw: str | None = None
+    department: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    confidence: str | None = None
+    verified_manually: bool | None = None
+
+
+class CompletenessOut(BaseModel):
+    total: int
+    fields: dict[str, dict[str, float | int]]
+    by_type: list[dict]
+    persons: dict[str, int]
+    attempts: dict[str, int]
 
 
 class JobOut(BaseModel):

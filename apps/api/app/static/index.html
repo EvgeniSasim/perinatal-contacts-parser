@@ -15,38 +15,112 @@
     <div class="keys">
       <label>API key <input id="apiKey" type="password" placeholder="X-API-Key" /></label>
       <button id="exportBtn" type="button">Excel</button>
-      <button id="mailBtn" type="button">Рассылка (dry-run)</button>
+      <button id="mailBtn" type="button">Рассылка</button>
+      <button id="enrichBtn" type="button" class="ghost">Обогатить</button>
     </div>
   </header>
-  <section class="filters">
-    <input id="q" placeholder="Поиск…" />
-    <select id="type"><option value="">Все типы</option></select>
-    <select id="region"><option value="">Все регионы</option></select>
-    <input id="city" placeholder="Город" />
-    <label><input id="hasEmail" type="checkbox" /> только email</label>
-    <button id="searchBtn" type="button">Найти</button>
+
+  <nav class="tabs">
+    <button type="button" class="tab active" data-tab="catalog">Каталог</button>
+    <button type="button" class="tab" data-tab="quality">Полнота данных</button>
+    <button type="button" class="tab" data-tab="queue">Очередь проверки</button>
+  </nav>
+
+  <section id="tab-catalog" class="tabpanel">
+    <div class="filters">
+      <input id="q" placeholder="Поиск по названию, адресу, ФИО…" />
+      <select id="type"><option value="">Все типы</option></select>
+      <select id="region"><option value="">Все регионы</option></select>
+      <input id="city" placeholder="Город" />
+      <label class="inline"><input id="hasEmail" type="checkbox" /> только с email</label>
+      <label class="inline"><input id="hasChief" type="checkbox" /> только с главврачом</label>
+      <button id="searchBtn" type="button">Найти</button>
+    </div>
+    <p id="meta" class="meta"></p>
+    <div class="layout">
+      <table>
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th>Тип</th>
+            <th>Город</th>
+            <th>Главный врач</th>
+            <th>Отделение патологии</th>
+            <th>Контакты</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <aside id="card" class="card hidden">
+        <button id="closeCard" type="button" class="ghost close">×</button>
+        <h2 id="cardTitle"></h2>
+        <dl id="cardFacts" class="facts"></dl>
+        <h3>Персоны</h3>
+        <div id="cardPersons" class="persons"></div>
+        <button id="enrichOneBtn" type="button" class="ghost">Обогатить это учреждение</button>
+      </aside>
+    </div>
   </section>
-  <p id="meta" class="meta"></p>
-  <div class="layout">
+
+  <section id="tab-quality" class="tabpanel hidden">
+    <p class="meta">Метрики считаются по всем записям, кроме отклонённых.</p>
+    <div id="qualityFields" class="metrics"></div>
+    <h3>По типам учреждений</h3>
     <table>
       <thead>
-        <tr>
-          <th>Название</th>
-          <th>Тип</th>
-          <th>Регион</th>
-          <th>Город</th>
-          <th>Телефон</th>
-          <th>Email</th>
-        </tr>
+        <tr><th>Тип</th><th>Записей</th><th>Главврач</th><th>Email</th><th>Телефон</th><th>Сайт</th></tr>
       </thead>
-      <tbody id="rows"></tbody>
+      <tbody id="qualityTypes"></tbody>
     </table>
-    <aside id="card" class="card hidden">
-      <h2 id="cardTitle"></h2>
-      <pre id="cardBody"></pre>
-      <button id="closeCard" type="button">Закрыть</button>
-    </aside>
-  </div>
+    <h3>Шаги обогащения</h3>
+    <div id="qualityAttempts" class="metrics"></div>
+  </section>
+
+  <section id="tab-queue" class="tabpanel hidden">
+    <div class="filters">
+      <select id="queueRole">
+        <option value="">Все роли</option>
+        <option value="chief">Главный врач</option>
+        <option value="pathology_head">Зав. отделением патологии</option>
+        <option value="deputy">Заместитель</option>
+        <option value="head">Зав. отделением</option>
+      </select>
+      <select id="queueConfidence">
+        <option value="">Любая достоверность</option>
+        <option value="high">high</option>
+        <option value="medium">medium</option>
+        <option value="low">low</option>
+      </select>
+      <label class="inline"><input id="queueUnverified" type="checkbox" checked /> только непроверенные</label>
+      <button id="queueBtn" type="button">Показать</button>
+    </div>
+    <p id="queueMeta" class="meta"></p>
+    <table>
+      <thead>
+        <tr><th>ФИО</th><th>Роль</th><th>Должность</th><th>Достоверность</th><th>Источник</th><th></th></tr>
+      </thead>
+      <tbody id="queueRows"></tbody>
+    </table>
+  </section>
+
+  <dialog id="mailDialog">
+    <form method="dialog">
+      <h2>Рассылка</h2>
+      <label>Тема<input id="mailSubject" value="Приглашение для {{name}}" /></label>
+      <label>Текст письма
+        <textarea id="mailBody" rows="5">&lt;p&gt;Уважаемый(ая) {{chief}}!&lt;/p&gt;</textarea>
+      </label>
+      <p class="hint">Подстановки: <code>{{name}}</code>, <code>{{city}}</code>, <code>{{region}}</code>,
+        <code>{{chief}}</code>, <code>{{address}}</code>. Фильтр берётся из каталога.</p>
+      <div id="mailPreview" class="preview"></div>
+      <menu>
+        <button id="mailPreviewBtn" type="button" class="ghost">Предпросмотр</button>
+        <button id="mailSendBtn" type="button">Создать (dry-run)</button>
+        <button value="cancel" class="ghost">Закрыть</button>
+      </menu>
+    </form>
+  </dialog>
+
   <script src="/static/admin.js"></script>
 </body>
 </html>

@@ -9,3 +9,4 @@ storage/exports/*.xlsx
 node_modules/
 .DS_Store
 data/raw/
+data/fixtures/

@@ -8,14 +8,14 @@ from fastapi.staticfiles import StaticFiles
 from app.api import admin, public
 from app.config import get_settings
 from app.db import SessionLocal, init_db
-from app.services.seed import load_seed_csv
+from app.services.seed import load_persons_csv, load_seed_csv
 
 ROOT = Path(__file__).resolve().parents[3]
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title=settings.app_name, version="0.1.0")
+    app = FastAPI(title=settings.app_name, version="0.2.0")
     origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
@@ -44,6 +44,7 @@ def create_app() -> FastAPI:
             db = SessionLocal()
             try:
                 load_seed_csv(db, seed_path)
+                load_persons_csv(db, seed_path.with_name("persons.csv"))
             finally:
                 db.close()
 

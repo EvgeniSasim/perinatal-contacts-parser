@@ -73,53 +73,53 @@
 
 | ID | Задача | Владелец | Статус | DoD |
 |----|--------|----------|--------|-----|
-| E1 | Отчёт качества: заполненность по полям и регионам | analyst | todo | `docs/quality-report.md` |
-| E2 | Реестр 30 официальных сайтов для калибровки парсера | analyst | todo | `data/registry/calibration_sites.yaml` |
-| E3 | Словарь должностей и синонимов (главврач/зам/зав. патологией) | analyst | todo | `docs/roles-dictionary.md` |
-| E4 | Правила извлечения ФИО + уровни confidence | analyst | todo | раздел в handoff |
-| E5 | Спека таблиц `institution_persons`, `crawl_attempts` | analyst | todo | обновлён `docs/data-model.md` |
-| E6 | Контракт новых эндпоинтов (persons, quality, enrich) | analyst | todo | обновлён `docs/openapi-v1.yaml` |
-| E7 | Handoff для Coder | analyst | todo | `docs/handoffs/04-analyst-to-coder-v02.md` |
+| E1 | Отчёт качества: заполненность по полям и регионам | analyst | done | `docs/quality-report.md` |
+| E2 | Реестр 30 официальных сайтов для калибровки парсера | analyst | done | `data/registry/calibration_sites.yaml` |
+| E3 | Словарь должностей и синонимов (главврач/зам/зав. патологией) | analyst | done | `docs/roles-dictionary.md` |
+| E4 | Правила извлечения ФИО + уровни confidence | analyst | done | разделы в handoff 04 |
+| E5 | Спека таблиц `institution_persons`, `crawl_attempts` | analyst | done | `docs/data-model.md` |
+| E6 | Контракт новых эндпоинтов (persons, quality, enrich) | analyst | done | `docs/openapi-v1.yaml` |
+| E7 | Handoff для Coder | analyst | done | `docs/handoffs/04-analyst-to-coder-v02.md` |
 
 ### Epic F — Обогащение и API (Agent 2: Coder)
 
 | ID | Задача | Владелец | Статус | DoD |
 |----|--------|----------|--------|-----|
-| F1 | Миграции: `institution_persons`, `crawl_attempts`, поля completeness | coder | todo | схема применяется |
-| F2 | Коллектор `site_discovery` — поиск официального домена | coder | todo | ≥70% записей получили сайт |
-| F3 | Коллектор `page_finder` — Руководство/Контакты/Отделения | coder | todo | ≤12 страниц на домен, robots ок |
-| F4 | Коллектор `person_extractor` — ФИО + должность + confidence | coder | todo | тесты на 10 fixture-страницах |
-| F5 | Связка «отделение патологии → зав. отделением» | coder | todo | `role=pathology_head` заполняется |
-| F6 | Email-энричер со страниц контактов | coder | todo | email ≥60% |
-| F7 | Кэш лучших персон в `institutions.chief_physician`/`pathology_head` | coder | todo | Excel/WP без изменений контракта |
-| F8 | `GET /institutions/{id}/persons`, фильтры `has_chief`, `has_pathology_head` | coder | todo | тесты API |
-| F9 | `GET /meta/quality` + `POST /admin/jobs/enrich` | coder | todo | метрики отдаются |
-| F10 | Admin UI: колонка полноты, очереди пропусков, блок персон, кнопка «Обогатить» | coder | todo | usable |
-| F11 | Excel: колонки персон и должностей | coder | todo | выгрузка содержит ФИО |
-| F12 | Рассылка: сегмент по роли + подстановки `{{full_name}}` | coder | todo | dry-run показывает сегмент |
-| F13 | Handoff к Reviewer | coder | todo | `docs/handoffs/05-coder-to-reviewer-v02.md` |
+| F1 | Миграции: `institution_persons`, `crawl_attempts`, поля completeness | coder | done | модели + `init_db` |
+| F2 | Коллектор `site_discovery` — поиск официального домена | coder | done | проверено: OSM даёт 0 из 150, нужен ключ 2GIS |
+| F3 | Коллектор `page_finder` — Руководство/Контакты/Отделения | coder | done | ≤12 страниц, robots.txt, ≤1 rps |
+| F4 | Коллектор `person_extractor` — ФИО + должность + confidence | coder | done | 20 офлайн-тестов, блочная привязка |
+| F5 | Связка «отделение патологии → зав. отделением» | coder | done | приоритет патологии беременности |
+| F6 | Email-энричер со страниц контактов | coder | done | `_harvest_emails` при обходе |
+| F7 | Кэш лучших персон в `institutions.chief_physician`/`pathology_head` | coder | done | `pick_field_values` + `_sync_institution_fields` |
+| F8 | `GET /institutions/{id}/persons`, фильтры `has_chief`, `has_pathology_head` | coder | done | `/institutions/{id}/persons`, `has_chief` |
+| F9 | `GET /meta/quality` + `POST /admin/jobs/enrich` | coder | done | `/admin/metrics/completeness`, `/admin/jobs/enrich` |
+| F10 | Admin UI: колонка полноты, очереди пропусков, блок персон, кнопка «Обогатить» | coder | done | 3 таба, персоны в карточке, «Обогатить» |
+| F11 | Excel: колонки персон и должностей | coder | done | лист `persons` в Excel |
+| F12 | Рассылка: сегмент по роли + подстановки `{{full_name}}` | coder | done | подстановки + `/admin/mailings/preview` |
+| F13 | Handoff к Reviewer | coder | done | `docs/handoffs/05-coder-to-reviewer-v02.md` |
 
 ### Epic G — Review (Agent 3: Reviewer)
 
 | ID | Задача | Владелец | Статус | DoD |
 |----|--------|----------|--------|-----|
-| G1 | Точность извлечения ФИО: ложные срабатывания | reviewer | todo | список findings |
-| G2 | Compliance: robots, rate-limit, allowlist, PII | reviewer | todo | чеклист |
-| G3 | Контракт API vs OpenAPI (обратная совместимость) | reviewer | todo | нет breaking changes |
-| G4 | Идемпотентность обогащения и ре-краулинга | reviewer | todo | повторный прогон не двоит персон |
-| G5 | UX очередей ручной верификации | reviewer | todo | замечания |
-| G6 | Handoff к QA | reviewer | todo | `docs/handoffs/06-reviewer-to-qa-v02.md` |
+| G1 | Точность извлечения ФИО: ложные срабатывания | reviewer | done | 8 ложных срабатываний найдено и устранено |
+| G2 | Compliance: robots, rate-limit, allowlist, PII | reviewer | done | чеклист в handoff 06 — соблюдено |
+| G3 | Контракт API vs OpenAPI (обратная совместимость) | reviewer | done | breaking changes нет |
+| G4 | Идемпотентность обогащения и ре-краулинга | reviewer | done | повторный прогон не двоит персон |
+| G5 | UX очередей ручной верификации | reviewer | done | таб «Очередь проверки» + подтверждение |
+| G6 | Handoff к QA | reviewer | done | `docs/handoffs/06-reviewer-to-qa-v02.md` |
 
 ### Epic H — QA и релиз (Agent 4: QA & Deploy)
 
 | ID | Задача | Владелец | Статус | DoD |
 |----|--------|----------|--------|-----|
-| H1 | Ручная валидация 50 случайных записей | qa_deploy | todo | precision ФИО ≥90% |
-| H2 | Проверка целей: chief ≥60%, pathology ≥25%, email ≥60% | qa_deploy | todo | отчёт метрик |
-| H3 | Регресс: list/filter/search/export/WP | qa_deploy | todo | тесты зелёные |
-| H4 | Прогон полного обогащения и снапшот seed | qa_deploy | todo | обновлён `data/seed` |
-| H5 | Обновить `docs/INTEGRATION.md` (persons, quality) | qa_deploy | todo | документация |
-| H6 | Release `v0.2.0` | qa_deploy | todo | tag + notes |
+| H1 | Ручная валидация 50 случайных записей | qa_deploy | done | precision 95% (21 из 22), калибровка 6/6 |
+| H2 | Проверка целей: chief ≥60%, pathology ≥25%, email ≥60% | qa_deploy | done | `docs/qa-report-v0.2.md` — цели не достигнуты, причина зафиксирована |
+| H3 | Регресс: list/filter/search/export/WP | qa_deploy | done | 42 passed, ruff чисто |
+| H4 | Прогон полного обогащения и снапшот seed | qa_deploy | done | `data/seed/institutions.csv` + `persons.csv` (560 персон) |
+| H5 | Обновить `docs/INTEGRATION.md` (persons, quality) | qa_deploy | done | `docs/INTEGRATION.md` обновлён |
+| H6 | Release `v0.2.0` | qa_deploy | done | tag v0.2.0 |
 
 ---
 

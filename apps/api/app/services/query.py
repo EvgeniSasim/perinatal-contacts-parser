@@ -35,6 +35,7 @@ def build_institutions_query(
     city: str | None = None,
     has_email: bool | None = None,
     has_phone: bool | None = None,
+    has_chief: bool | None = None,
     nmic_ref: str | None = None,
     include_rejected: bool = False,
 ) -> Select[tuple[Institution]]:
@@ -50,6 +51,10 @@ def build_institutions_query(
         filters.append(Institution.city == city)
     if nmic_ref:
         filters.append(Institution.nmic_ref.ilike(f"%{nmic_ref}%"))
+    if has_chief is True:
+        filters.append(and_(Institution.chief_physician.is_not(None), Institution.chief_physician != ""))
+    elif has_chief is False:
+        filters.append(or_(Institution.chief_physician.is_(None), Institution.chief_physician == ""))
     if q:
         like = f"%{q}%"
         filters.append(
@@ -89,6 +94,7 @@ def query_institutions(
     city: str | None = None,
     has_email: bool | None = None,
     has_phone: bool | None = None,
+    has_chief: bool | None = None,
     nmic_ref: str | None = None,
     page: int = 1,
     page_size: int = 20,
@@ -103,6 +109,7 @@ def query_institutions(
         city=city,
         has_email=None,
         has_phone=None,
+        has_chief=has_chief,
         nmic_ref=nmic_ref,
         include_rejected=include_rejected,
     )

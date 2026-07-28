@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Perinatal Contacts Directory
  * Description: Каталог перинатальных центров и ЖК через REST API
- * Version: 0.1.0
+ * Version: 0.2.0
  * Author: EvgeniSasim
  * Text Domain: perinatal-contacts
  */
@@ -76,7 +76,10 @@ function pnc_render_settings_page() {
         </table>
         <?php submit_button(); ?>
       </form>
-      <p>Shortcode: <code>[pnc_directory]</code> — атрибуты <code>region</code>, <code>type</code>, <code>q</code>, <code>city</code>.</p>
+      <p>Shortcode: <code>[pnc_directory]</code> — атрибуты <code>region</code>, <code>type</code>, <code>q</code>,
+        <code>city</code>, <code>has_chief</code>.</p>
+      <p>Пример: <code>[pnc_directory type="perinatal_center" has_chief="1"]</code> — только перинатальные центры,
+        у которых известен главный врач.</p>
     </div>
     <?php
 }
@@ -89,6 +92,11 @@ function pnc_fetch_institutions($args) {
     foreach (array('region', 'type', 'q', 'city') as $key) {
         if (!empty($args[$key])) {
             $query[$key] = $args[$key];
+        }
+    }
+    foreach (array('has_chief', 'has_email', 'has_phone') as $flag) {
+        if (!empty($args[$flag])) {
+            $query[$flag] = 'true';
         }
     }
     $url = trailingslashit($opts['api_url']) . 'institutions?' . http_build_query($query);
@@ -120,18 +128,21 @@ add_shortcode('pnc_directory', function ($atts) {
         'type' => '',
         'q' => '',
         'city' => '',
+        'has_chief' => '',
     ), $atts, 'pnc_directory');
 
     $q = isset($_GET['pnc_q']) ? sanitize_text_field(wp_unslash($_GET['pnc_q'])) : $atts['q'];
     $region = isset($_GET['pnc_region']) ? sanitize_text_field(wp_unslash($_GET['pnc_region'])) : $atts['region'];
     $type = isset($_GET['pnc_type']) ? sanitize_text_field(wp_unslash($_GET['pnc_type'])) : $atts['type'];
     $city = isset($_GET['pnc_city']) ? sanitize_text_field(wp_unslash($_GET['pnc_city'])) : $atts['city'];
+    $has_chief = isset($_GET['pnc_has_chief']) ? '1' : $atts['has_chief'];
 
     $data = pnc_fetch_institutions(array(
         'q' => $q,
         'region' => $region,
         'type' => $type,
         'city' => $city,
+        'has_chief' => $has_chief,
     ));
 
     ob_start();
@@ -142,6 +153,10 @@ add_shortcode('pnc_directory', function ($atts) {
         <input type="text" name="pnc_region" value="<?php echo esc_attr($region); ?>" placeholder="Регион" />
         <input type="text" name="pnc_city" value="<?php echo esc_attr($city); ?>" placeholder="Город" />
         <input type="text" name="pnc_type" value="<?php echo esc_attr($type); ?>" placeholder="Тип" />
+        <label>
+          <input type="checkbox" name="pnc_has_chief" value="1" <?php checked(!empty($has_chief)); ?> />
+          только с главным врачом
+        </label>
         <button type="submit">Найти</button>
       </form>
       <?php if (isset($data['error'])) : ?>
@@ -160,8 +175,14 @@ add_shortcode('pnc_directory', function ($atts) {
               <?php if (!empty($item['emails'])) : ?>
                 Email: <?php echo esc_html(implode(', ', $item['emails'])); ?><br />
               <?php endif; ?>
+              <?php if (!empty($item['website'])) : ?>
+                Сайт: <a href="<?php echo esc_url($item['website']); ?>" target="_blank" rel="noopener nofollow"><?php echo esc_html($item['website']); ?></a><br />
+              <?php endif; ?>
               <?php if (!empty($item['chief_physician'])) : ?>
-                Главный врач: <?php echo esc_html($item['chief_physician']); ?>
+                Главный врач: <?php echo esc_html($item['chief_physician']); ?><br />
+              <?php endif; ?>
+              <?php if (!empty($item['pathology_head'])) : ?>
+                Отделение патологии: <?php echo esc_html($item['pathology_head']); ?>
               <?php endif; ?>
             </li>
           <?php endforeach; ?>

@@ -384,7 +384,6 @@ def collect_russiamedtravel() -> list[dict[str, Any]]:
                 # region often prefixed in link text
                 region = ""
                 city = ""
-                parts = name.split(" ", 2)
                 # "Ростовская область ..." pattern
                 m = re.match(r"^(.+?(?:область|край|республика|округ))\s+(.+)$", name, re.I)
                 if m:
