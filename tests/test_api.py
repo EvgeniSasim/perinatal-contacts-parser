@@ -96,3 +96,26 @@ def test_html_collector_fixture():
 def test_ssrf_blocked():
     with pytest.raises(ValueError):
         fetch_and_parse("https://evil.example.net/x")
+
+
+def test_crawl_2gis_requires_key(client):
+    r = client.post(
+        "/api/v1/admin/jobs/crawl",
+        json={"source": "2gis", "cities": ["Москва"]},
+        headers={"X-API-Key": "test-key"},
+    )
+    assert r.status_code == 202
+    body = r.json()
+    assert body["status"] == "failed"
+    assert "DGIS_API_KEY" in (body.get("error") or "")
+
+
+def test_classify_and_sites_registry():
+    from app.services.collectors.base import classify_type
+    from app.services.collectors.site_registry import load_registry
+
+    assert classify_type("Женская консультация №5") == "womens_clinic"
+    assert classify_type("Областной перинатальный центр") == "perinatal_center_regional"
+    rows = load_registry(ROOT / "data" / "registry" / "official_sites.yaml")
+    assert len(rows) >= 4
+    assert any("Кулакова" in r["name"] for r in rows)

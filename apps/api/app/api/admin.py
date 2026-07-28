@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
 from app.db import get_db
 from app.deps import require_admin_api_key
 from app.models import Institution, Job, MailCampaign
@@ -19,11 +18,12 @@ from app.schemas import (
     MailingRequest,
 )
 from app.services.collectors.html_generic import fetch_and_parse
+from app.services.crawl_runner import run_crawl
 from app.services.export import run_export_job
 from app.services.mailing import run_mailing
 from app.services.normalize import normalize_email, normalize_name, normalize_phone
 from app.services.query import to_out
-from app.services.seed import load_seed_csv, upsert_institution
+from app.services.seed import upsert_institution
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin_api_key)])
 
@@ -96,14 +96,11 @@ def crawl(body: CrawlRequest, db: Session = Depends(get_db)) -> JobOut:
     job.status = "running"
     db.commit()
     try:
-        if body.source == "seed_csv":
-            count = load_seed_csv(db, get_settings().seed_csv_path)
-            job.result_json = {"loaded": count}
-        elif body.source == "html" and body.url:
+        if body.source == "html" and body.url:
             parsed = fetch_and_parse(body.url)
             job.result_json = {"parsed": parsed}
         else:
-            raise ValueError("Unsupported crawl source or missing url")
+            job.result_json = run_crawl(db, body.source, cities=body.cities)
         job.status = "done"
     except Exception as exc:  # noqa: BLE001
         job.status = "failed"

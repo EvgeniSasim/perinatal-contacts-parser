@@ -1,39 +1,55 @@
-# Источники MVP
+# Источники данных (реальные)
 
-Целевой объём seed для MVP: **≥100** записей (смешанные типы, ≥15 регионов).
+## Что используется сейчас
 
-## Приоритет источников
+| Источник | Тип доступа | Ключ | Что даёт | Статус |
+|----------|-------------|------|----------|--------|
+| **OpenStreetMap / Nominatim** | публичный API | не нужен | название, адрес, город, иногда телефон/сайт | ✅ подключено |
+| **Реестр официальных сайтов** `data/registry/official_sites.yaml` | HTTP HTML | не нужен | телефон, email, ФИО с публичных страниц | ✅ подключено |
+| **Seed CSV** `data/seed/institutions.csv` | файл | не нужен | снимок OSM+sites (сейчас ~206 реальных POI) | ✅ |
+| **2GIS Places API** | официальный API | `DGIS_API_KEY` | контакты, адреса по городам | ✅ код готов, нужен ключ |
+| **Яндекс API Поиска по организациям** | официальный API | `YANDEX_MAPS_API_KEY` | организации + телефоны | ✅ код готов, нужен ключ |
 
-| # | Источник | Тип данных | Полнота полей | Метод |
-|---|----------|------------|---------------|-------|
-| 1 | Seed CSV проекта (`data/seed/institutions.csv`) | все типы | высокая (кураторский) | loader |
-| 2 | Публичные страницы НМИЦ АГ (ncagp.ru и аналоги) | nmic + ссылки | средняя | HTML httpx+BS4 |
-| 3 | Региональные минздравы / списки ПЦ | perinatal_* | средняя | HTML |
-| 4 | Сайты учреждений (добор) | phones/email/ФИО | низкая–средняя | httpx, позже Playwright |
-| 5 | Открытые справочники субъектов РФ | ЖК/роддома | низкая | ручной CSV |
+## Важно про 2GIS / Яндекс.Карты
 
-## MVP-коллекторы (реализация)
+- HTML-страницы `2gis.ru` и `yandex.ru/maps` **не парсим** (нарушение ToS / антибот).
+- Используем только **официальные HTTP API**.
+- Ключи: [2GIS Platform](https://platform.2gis.ru/), [Яндекс Developer](https://developer.tech.yandex.ru/).
 
-1. **`seed_csv`** — обязательный, идемпотентный upsert по name_norm+city.
-2. **`html_list_generic`** — конфиг: URL + CSS/regex селекторы из YAML; один рабочий пример на статическом fixture + опционально live URL.
+## Как запустить сбор
 
-Live-краулинг без allowlist доменов **запрещён** (SSRF).
+```bash
+# Бесплатные источники (OSM + официальные сайты + seed)
+PYTHONPATH=apps/api python scripts/crawl_real.py --source all_free
 
-## Оценка полей по источникам
+# Только OSM (долго: ~1 req/sec)
+PYTHONPATH=apps/api python scripts/crawl_real.py --source osm
 
-| Поле | seed | nmic html | site enrich |
-|------|------|-----------|-------------|
-| address | ✓ | ✓ | ✓ |
-| phones | ✓ | ~ | ✓ |
-| emails | ✓ | ~ | ✓ |
-| chief_physician | ✓ | ~ | ~ |
-| pathology_head | ✓ | ✗ | ~ |
-| nmic_ref | ✓ | ✓ | ✗ |
+# 2GIS / Яндекс (нужны ключи в .env)
+export DGIS_API_KEY=...
+export YANDEX_MAPS_API_KEY=...
+PYTHONPATH=apps/api python scripts/crawl_real.py --source 2gis
+PYTHONPATH=apps/api python scripts/crawl_real.py --source yandex
+PYTHONPATH=apps/api python scripts/crawl_real.py --source all
+
+# Через API
+curl -X POST http://localhost:8000/api/v1/admin/jobs/crawl \
+  -H 'X-API-Key: YOUR_KEY' -H 'Content-Type: application/json' \
+  -d '{"source":"all_free"}'
+```
+
+Источники `source`: `seed_csv` | `osm` | `sites` | `2gis` | `yandex` | `all_free` | `all` | `html`.
 
 ## Compliance
 
-- Только публичный HTML/CSV.
-- Rate limit: ≤1 rps на домен, jitter.
-- User-Agent: `PerinatalContactsBot/0.1 (+https://github.com/EvgeniSasim/perinatal-contacts-parser)`.
-- Уважать robots.txt; при Disallow — skip + log.
-- Не обходить CAPTCHA/auth.
+- User-Agent: `PerinatalContactsBot/0.1 (+github…)`
+- Nominatim: ≤1 rps
+- Allowlist доменов для HTML (anti-SSRF)
+- Без обхода CAPTCHA/логинов
+
+## Полнота полей
+
+OSM часто без email/ФИО главного врача — добор:
+1. 2GIS/Yandex API (телефоны/сайты)
+2. `official_sites.yaml` + HTML collector
+3. ручная верификация в Admin UI

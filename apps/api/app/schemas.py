@@ -80,8 +80,9 @@ class MailingRequest(BaseModel):
 
 
 class CrawlRequest(BaseModel):
-    source: str = "seed_csv"
+    source: str = "all_free"
     url: str | None = None
+    cities: list[str] | None = None
 
 
 class JobOut(BaseModel):

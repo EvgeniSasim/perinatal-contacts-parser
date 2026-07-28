@@ -1,0 +1,56 @@
+institutions:
+  - name: "ФГБУ «НМИЦ АГП им. В.И. Кулакова» Минздрава России"
+    type: nmic
+    region: Москва
+    city: Москва
+    address: "ул. Академика Опарина, 4"
+    phones: "+74955314444"
+    emails: "info@oparina4.ru"
+    website: "https://ncagp.ru"
+    source_url: "https://ncagp.ru/"
+    verification_status: verified
+
+  - name: "ГБУЗ ВО «Областной перинатальный центр»"
+    type: perinatal_center_regional
+    region: Владимирская область
+    city: Владимир
+    address: "ул. Константино-Еленинский проезд, д.1"
+    phones: "+74922445858"
+    emails: "post@opc33.ru"
+    website: "https://opc33.ru"
+    source_url: "https://opc33.ru/"
+    verification_status: verified
+
+  - name: "ГБУ «Перинатальный центр» Ростовской области"
+    type: perinatal_center_regional
+    region: Ростовская область
+    city: Ростов-на-Дону
+    address: "ул. Бодрая, 90"
+    phones: "+78632855979;+78632851004"
+    emails: "perinatal-rost@mail.ru"
+    website: "https://perinatal-rostov.ru"
+    source_url: "https://perinatal-rostov.ru/kontaktyi.html"
+    verification_status: verified
+
+  - name: "КОГБУЗ «Кировский областной клинический перинатальный центр»"
+    type: perinatal_center_regional
+    region: Кировская область
+    city: Киров
+    address: "ул. Московская, д.163"
+    phones: "+78332555300"
+    emails: "mail@pncenter.ru"
+    website: "https://pncenter.ru"
+    chief_physician: "Семеновский Н.В."
+    source_url: "https://pncenter.ru/"
+    verification_status: verified
+
+  - name: "ГБУЗ РК «Коми республиканский клинический перинатальный центр»"
+    type: perinatal_center_regional
+    region: Республика Коми
+    city: Сыктывкар
+    address: "ул. Пушкина, д. 114/4"
+    phones: "+78212229801"
+    emails: "krpc@perinatal-komi.ru"
+    website: "http://perinatal-komi.ru"
+    source_url: "http://perinatal-komi.ru/"
+    verification_status: verified

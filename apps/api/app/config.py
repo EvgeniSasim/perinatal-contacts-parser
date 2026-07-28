@@ -12,7 +12,15 @@ class Settings(BaseSettings):
     public_api_key: str = ""
     storage_dir: str = "storage"
     seed_csv_path: str = "data/seed/institutions.csv"
-    crawl_allowlist: str = "ncagp.ru,example.com,localhost"
+    sites_registry_path: str = "data/registry/official_sites.yaml"
+    crawl_allowlist: str = (
+        "ncagp.ru,opc33.ru,perinatal-rostov.ru,pncenter.ru,perinatal-komi.ru,"
+        "example.com,localhost,openstreetmap.org,nominatim.openstreetmap.org,"
+        "catalog.api.2gis.com,2gis.ru,search-maps.yandex.ru,yandex.ru"
+    )
+    crawl_delay_sec: float = 1.0
+    dgis_api_key: str = ""
+    yandex_maps_api_key: str = ""
     allow_live_mail: bool = False
     cors_origins: str = "*"
 

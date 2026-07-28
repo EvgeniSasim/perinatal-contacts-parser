@@ -8,3 +8,4 @@ storage/exports/*.xlsx
 *.db
 node_modules/
 .DS_Store
+data/raw/
