@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.pytest_cache/
+.ruff_cache/
+storage/exports/*.xlsx
+*.db
+node_modules/
+.DS_Store

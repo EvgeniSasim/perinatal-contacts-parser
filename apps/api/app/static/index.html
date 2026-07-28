@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Perinatal Contacts Admin</title>
+  <link rel="stylesheet" href="/static/admin.css" />
+</head>
+<body>
+  <header class="top">
+    <div>
+      <p class="brand">Perinatal Contacts</p>
+      <h1>Каталог учреждений</h1>
+    </div>
+    <div class="keys">
+      <label>API key <input id="apiKey" type="password" placeholder="X-API-Key" /></label>
+      <button id="exportBtn" type="button">Excel</button>
+      <button id="mailBtn" type="button">Рассылка (dry-run)</button>
+    </div>
+  </header>
+  <section class="filters">
+    <input id="q" placeholder="Поиск…" />
+    <select id="type"><option value="">Все типы</option></select>
+    <select id="region"><option value="">Все регионы</option></select>
+    <input id="city" placeholder="Город" />
+    <label><input id="hasEmail" type="checkbox" /> только email</label>
+    <button id="searchBtn" type="button">Найти</button>
+  </section>
+  <p id="meta" class="meta"></p>
+  <div class="layout">
+    <table>
+      <thead>
+        <tr>
+          <th>Название</th>
+          <th>Тип</th>
+          <th>Регион</th>
+          <th>Город</th>
+          <th>Телефон</th>
+          <th>Email</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <aside id="card" class="card hidden">
+      <h2 id="cardTitle"></h2>
+      <pre id="cardBody"></pre>
+      <button id="closeCard" type="button">Закрыть</button>
+    </aside>
+  </div>
+  <script src="/static/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -r apps/api/requirements.txt
+      - name: Pytest
+        env:
+          PYTHONPATH: apps/api
+          DATABASE_URL: sqlite+pysqlite:////tmp/pnc-ci.db
+          ADMIN_API_KEY: test-key
+          SEED_CSV_PATH: data/seed/institutions.csv
+          STORAGE_DIR: storage
+          CRAWL_ALLOWLIST: example.com,localhost
+        run: pytest -q

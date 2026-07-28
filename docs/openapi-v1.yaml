@@ -1,0 +1,165 @@
+openapi: 3.0.3
+info:
+  title: Perinatal Contacts API
+  version: 1.0.0
+servers:
+  - url: /api/v1
+paths:
+  /health:
+    get:
+      summary: Health
+      responses:
+        "200":
+          description: OK
+  /meta/types:
+    get:
+      summary: Institution types
+      responses:
+        "200":
+          description: OK
+  /meta/regions:
+    get:
+      summary: Regions present in DB
+      responses:
+        "200":
+          description: OK
+  /meta/stats:
+    get:
+      summary: Counts
+      responses:
+        "200":
+          description: OK
+  /institutions:
+    get:
+      summary: List institutions
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: type
+          schema: { type: string }
+        - in: query
+          name: region
+          schema: { type: string }
+        - in: query
+          name: city
+          schema: { type: string }
+        - in: query
+          name: has_email
+          schema: { type: boolean }
+        - in: query
+          name: has_phone
+          schema: { type: boolean }
+        - in: query
+          name: nmic_ref
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1, minimum: 1 }
+        - in: query
+          name: page_size
+          schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [name, updated_at, region], default: name }
+      responses:
+        "200":
+          description: Paginated list
+  /institutions/{id}:
+    get:
+      summary: Get by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not found
+  /admin/institutions:
+    post:
+      summary: Create
+      security: [{ ApiKeyAuth: [] }]
+      responses:
+        "201":
+          description: Created
+  /admin/institutions/{id}:
+    patch:
+      summary: Update
+      security: [{ ApiKeyAuth: [] }]
+      responses:
+        "200":
+          description: OK
+    delete:
+      summary: Soft-reject or delete
+      security: [{ ApiKeyAuth: [] }]
+      responses:
+        "204":
+          description: Deleted
+  /admin/jobs/crawl:
+    post:
+      summary: Enqueue crawl
+      security: [{ ApiKeyAuth: [] }]
+      responses:
+        "202":
+          description: Accepted
+  /admin/export:
+    post:
+      summary: Excel export by filter
+      security: [{ ApiKeyAuth: [] }]
+      responses:
+        "202":
+          description: Job created
+  /admin/export/{job_id}:
+    get:
+      summary: Export job status / download link
+      security: [{ ApiKeyAuth: [] }]
+      responses:
+        "200":
+          description: OK
+  /admin/mailings:
+    post:
+      summary: Create mailing (dry_run default true)
+      security: [{ ApiKeyAuth: [] }]
+      responses:
+        "202":
+          description: Accepted
+  /admin/mailings/{id}:
+    get:
+      summary: Mailing status
+      security: [{ ApiKeyAuth: [] }]
+      responses:
+        "200":
+          description: OK
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  schemas:
+    Institution:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        type: { type: string }
+        region: { type: string }
+        city: { type: string }
+        address: { type: string }
+        phones:
+          type: array
+          items: { type: string }
+        emails:
+          type: array
+          items: { type: string }
+        website: { type: string, nullable: true }
+        chief_physician: { type: string, nullable: true }
+        pathology_head: { type: string, nullable: true }
+        nmic_ref: { type: string, nullable: true }
+        source_url: { type: string }
+        verification_status: { type: string }
+        updated_at: { type: string, format: date-time }

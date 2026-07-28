@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pnc
+      POSTGRES_PASSWORD: pnc
+      POSTGRES_DB: pnc
+    ports:
+      - "5432:5432"
+    volumes:
+      - pnc_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pnc -d pnc"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://pnc:pnc@db:5432/pnc
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-dev-admin-key-change-me}
+      SEED_CSV_PATH: /app/data/seed/institutions.csv
+      STORAGE_DIR: /app/storage
+      CRAWL_ALLOWLIST: ncagp.ru,example.com,localhost
+      ALLOW_LIVE_MAIL: "false"
+      CORS_ORIGINS: "*"
+    volumes:
+      - pnc_storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pnc_pg:
+  pnc_storage:
