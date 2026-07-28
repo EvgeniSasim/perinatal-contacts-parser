@@ -27,22 +27,17 @@ COMPOSE_PROJECT_NAME=pnc docker compose up -d --build
 
 ## Возможности MVP
 
-- Реальные источники: OpenStreetMap/Nominatim, официальные сайты учреждений
-- 2GIS Places API и Яндекс Organizations API (по ключам)
-- ~200+ реальных POI в seed (перинатальные центры, роддома, ЖК)
+- Реальные источники: OSM, OrgPage, MedAdvisor, КП, Zdrav.expert, RussiaMedTravel, Vademecum, PDF Минздрава
+- 2GIS / Яндекс API (по ключам)
+- ~480 учреждений в seed
 - REST: поиск, фильтры, пагинация
-- Excel-экспорт по фильтру
-- Массовая рассылка (dry-run)
-- Admin UI
-- WordPress-плагин `[pnc_directory]`
+- Excel-экспорт, mailing dry-run, Admin UI, WP-плагин
 
-Сбор данных:
+Сбор каталогов:
 
 ```bash
-PYTHONPATH=apps/api python scripts/crawl_real.py --source all_free
+PYTHONPATH=apps/api python scripts/crawl_real.py --source catalogs
 ```
-
-Подробнее: [docs/sources-mvp.md](docs/sources-mvp.md)
 
 ## Документация
 

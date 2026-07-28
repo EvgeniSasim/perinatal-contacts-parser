@@ -16,7 +16,9 @@ class Settings(BaseSettings):
     crawl_allowlist: str = (
         "ncagp.ru,opc33.ru,perinatal-rostov.ru,pncenter.ru,perinatal-komi.ru,"
         "example.com,localhost,openstreetmap.org,nominatim.openstreetmap.org,"
-        "catalog.api.2gis.com,2gis.ru,search-maps.yandex.ru,yandex.ru"
+        "catalog.api.2gis.com,2gis.ru,search-maps.yandex.ru,yandex.ru,"
+        "orgpage.ru,www.orgpage.ru,medadvisor.ru,www.kp.ru,kp.ru,zdrav.expert,"
+        "russiamedtravel.ru,vademec.ru,minzdrav.gov-murman.ru"
     )
     crawl_delay_sec: float = 1.0
     dgis_api_key: str = ""

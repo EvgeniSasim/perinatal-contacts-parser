@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.services.collectors.catalogs import collect_catalogs
 from app.services.collectors.dgis import collect_2gis
 from app.services.collectors.osm_nominatim import collect_nominatim
 from app.services.collectors.site_registry import collect_site_registry
@@ -41,17 +42,34 @@ def run_crawl(db: Session, source: str, *, cities: list[str] | None = None) -> d
         rows = collect_yandex(cities=cities)
         return {"source": source, "loaded": persist_rows(db, rows)}
 
+    if source == "catalogs":
+        rows = collect_catalogs()
+        return {"source": source, "loaded": persist_rows(db, rows)}
+
+    catalog_keys = {
+        "orgpage",
+        "medadvisor",
+        "kp",
+        "zdrav",
+        "russiamedtravel",
+        "vademec",
+        "murman_pdf",
+    }
+    if source in catalog_keys:
+        rows = collect_catalogs([source])
+        return {"source": source, "loaded": persist_rows(db, rows)}
+
     if source == "all_free":
-        # Без коммерческих ключей: seed + OSM + официальные сайты
+        # Без коммерческих ключей: seed + OSM + сайты + каталоги
         summary: dict[str, Any] = {"source": source, "parts": []}
-        for part in ("seed_csv", "osm", "sites"):
+        for part in ("seed_csv", "osm", "sites", "catalogs"):
             summary["parts"].append(run_crawl(db, part, cities=cities))
         summary["loaded"] = sum(p.get("loaded", 0) for p in summary["parts"])
         return summary
 
     if source == "all":
         summary = {"source": source, "parts": []}
-        for part in ("seed_csv", "osm", "sites", "2gis", "yandex"):
+        for part in ("seed_csv", "osm", "sites", "catalogs", "2gis", "yandex"):
             try:
                 summary["parts"].append(run_crawl(db, part, cities=cities))
             except Exception as exc:  # noqa: BLE001

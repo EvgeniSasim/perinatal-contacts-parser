@@ -55,7 +55,24 @@ def main() -> None:
     parser.add_argument(
         "--source",
         default="all_free",
-        choices=["seed_csv", "osm", "sites", "2gis", "yandex", "all_free", "all", "refresh_seed"],
+        choices=[
+            "seed_csv",
+            "osm",
+            "sites",
+            "catalogs",
+            "orgpage",
+            "medadvisor",
+            "kp",
+            "zdrav",
+            "russiamedtravel",
+            "vademec",
+            "murman_pdf",
+            "2gis",
+            "yandex",
+            "all_free",
+            "all",
+            "refresh_seed",
+        ],
     )
     parser.add_argument("--cities", nargs="*", default=None)
     args = parser.parse_args()
