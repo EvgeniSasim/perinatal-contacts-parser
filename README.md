@@ -39,8 +39,20 @@ COMPOSE_PROJECT_NAME=pnc docker compose up -d --build
 PYTHONPATH=apps/api python scripts/crawl_real.py --source catalogs
 ```
 
+## Статус данных
+
+| Поле | Заполнено (из 482) |
+|------|--------------------|
+| Адрес | 100% |
+| Телефон | 44% |
+| Email | 2% |
+| ФИО главного врача | 0% |
+| Зав. отделения патологии | 0% |
+
+Следующая итерация `v0.2` закрывает именно ФИО и email — см. [docs/PLAN-v0.2.md](docs/PLAN-v0.2.md).
+
 ## Документация
 
-- [План](docs/PLAN.md) · [Задачи](docs/TASKS.md) · [Интеграция](docs/INTEGRATION.md)
-- [Модель данных](docs/data-model.md) · [Источники](docs/sources-mvp.md)
+- [План MVP](docs/PLAN.md) · [План v0.2](docs/PLAN-v0.2.md) · [Задачи](docs/TASKS.md)
+- [Интеграция](docs/INTEGRATION.md) · [Модель данных](docs/data-model.md) · [Источники](docs/sources-mvp.md)
 - [Оркестрация агентов](docs/ORCHESTRATION.md)

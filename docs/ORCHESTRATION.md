@@ -13,6 +13,19 @@
 4. **QA & Deploy** — `@prompts/04-qa-deploy.md` + `@docs/handoffs/03-reviewer-to-qa.md`  
    Жди: `DONE: mvp`
 
+## Итерация v0.2 — обогащение ФИО и email
+
+План: `docs/PLAN-v0.2.md`, задачи: Epic E–H в `docs/TASKS.md`.
+
+1. **Analyst** — `@prompts/05-analyst-v02.md` + `@docs/PLAN-v0.2.md` + `@docs/TASKS.md`
+   Жди: `HANDOFF_READY: coder`
+2. **Coder** — `@prompts/06-coder-v02.md` + `@docs/handoffs/04-analyst-to-coder-v02.md`
+   Жди: `HANDOFF_READY: reviewer`
+3. **Reviewer** — `@prompts/07-reviewer-v02.md` + `@docs/handoffs/05-coder-to-reviewer-v02.md`
+   Жди: `HANDOFF_READY: qa_deploy`
+4. **QA & Deploy** — `@prompts/08-qa-deploy-v02.md` + `@docs/handoffs/06-reviewer-to-qa-v02.md`
+   Жди: `DONE: v0.2.0`
+
 ## Репозиторий
 
 https://github.com/EvgeniSasim/perinatal-contacts-parser

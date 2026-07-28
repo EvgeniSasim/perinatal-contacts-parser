@@ -65,17 +65,81 @@
 
 ---
 
+## Итерация v0.2 — обогащение ФИО и email
+
+План: `docs/PLAN-v0.2.md`. Причина: главврач заполнен у 1/482, патология у 0/482, email у 12/482.
+
+### Epic E — Анализ обогащения (Agent 1: Analyst)
+
+| ID | Задача | Владелец | Статус | DoD |
+|----|--------|----------|--------|-----|
+| E1 | Отчёт качества: заполненность по полям и регионам | analyst | todo | `docs/quality-report.md` |
+| E2 | Реестр 30 официальных сайтов для калибровки парсера | analyst | todo | `data/registry/calibration_sites.yaml` |
+| E3 | Словарь должностей и синонимов (главврач/зам/зав. патологией) | analyst | todo | `docs/roles-dictionary.md` |
+| E4 | Правила извлечения ФИО + уровни confidence | analyst | todo | раздел в handoff |
+| E5 | Спека таблиц `institution_persons`, `crawl_attempts` | analyst | todo | обновлён `docs/data-model.md` |
+| E6 | Контракт новых эндпоинтов (persons, quality, enrich) | analyst | todo | обновлён `docs/openapi-v1.yaml` |
+| E7 | Handoff для Coder | analyst | todo | `docs/handoffs/04-analyst-to-coder-v02.md` |
+
+### Epic F — Обогащение и API (Agent 2: Coder)
+
+| ID | Задача | Владелец | Статус | DoD |
+|----|--------|----------|--------|-----|
+| F1 | Миграции: `institution_persons`, `crawl_attempts`, поля completeness | coder | todo | схема применяется |
+| F2 | Коллектор `site_discovery` — поиск официального домена | coder | todo | ≥70% записей получили сайт |
+| F3 | Коллектор `page_finder` — Руководство/Контакты/Отделения | coder | todo | ≤12 страниц на домен, robots ок |
+| F4 | Коллектор `person_extractor` — ФИО + должность + confidence | coder | todo | тесты на 10 fixture-страницах |
+| F5 | Связка «отделение патологии → зав. отделением» | coder | todo | `role=pathology_head` заполняется |
+| F6 | Email-энричер со страниц контактов | coder | todo | email ≥60% |
+| F7 | Кэш лучших персон в `institutions.chief_physician`/`pathology_head` | coder | todo | Excel/WP без изменений контракта |
+| F8 | `GET /institutions/{id}/persons`, фильтры `has_chief`, `has_pathology_head` | coder | todo | тесты API |
+| F9 | `GET /meta/quality` + `POST /admin/jobs/enrich` | coder | todo | метрики отдаются |
+| F10 | Admin UI: колонка полноты, очереди пропусков, блок персон, кнопка «Обогатить» | coder | todo | usable |
+| F11 | Excel: колонки персон и должностей | coder | todo | выгрузка содержит ФИО |
+| F12 | Рассылка: сегмент по роли + подстановки `{{full_name}}` | coder | todo | dry-run показывает сегмент |
+| F13 | Handoff к Reviewer | coder | todo | `docs/handoffs/05-coder-to-reviewer-v02.md` |
+
+### Epic G — Review (Agent 3: Reviewer)
+
+| ID | Задача | Владелец | Статус | DoD |
+|----|--------|----------|--------|-----|
+| G1 | Точность извлечения ФИО: ложные срабатывания | reviewer | todo | список findings |
+| G2 | Compliance: robots, rate-limit, allowlist, PII | reviewer | todo | чеклист |
+| G3 | Контракт API vs OpenAPI (обратная совместимость) | reviewer | todo | нет breaking changes |
+| G4 | Идемпотентность обогащения и ре-краулинга | reviewer | todo | повторный прогон не двоит персон |
+| G5 | UX очередей ручной верификации | reviewer | todo | замечания |
+| G6 | Handoff к QA | reviewer | todo | `docs/handoffs/06-reviewer-to-qa-v02.md` |
+
+### Epic H — QA и релиз (Agent 4: QA & Deploy)
+
+| ID | Задача | Владелец | Статус | DoD |
+|----|--------|----------|--------|-----|
+| H1 | Ручная валидация 50 случайных записей | qa_deploy | todo | precision ФИО ≥90% |
+| H2 | Проверка целей: chief ≥60%, pathology ≥25%, email ≥60% | qa_deploy | todo | отчёт метрик |
+| H3 | Регресс: list/filter/search/export/WP | qa_deploy | todo | тесты зелёные |
+| H4 | Прогон полного обогащения и снапшот seed | qa_deploy | todo | обновлён `data/seed` |
+| H5 | Обновить `docs/INTEGRATION.md` (persons, quality) | qa_deploy | todo | документация |
+| H6 | Release `v0.2.0` | qa_deploy | todo | tag + notes |
+
+---
+
 ## Порядок исполнения
 
 ```
-A1–A7 (Analyst) ✓
-    ↓ handoff 01
-B1–B11 (Coder) ✓
-    ↓ handoff 02
-C1–C6 (Reviewer) ✓
-    ↓ handoff 03
-D1–D7 (QA & Deploy) — D4 blocked without Docker/VPS
+v0.1.0 (выпущено)
+A1–A7 (Analyst) ✓ → B1–B11 (Coder) ✓ → C1–C6 (Reviewer) ✓ → D1–D7 (QA) ✓ кроме D4
+
+v0.2.0 (текущая цель)
+E1–E7 (Analyst)
+    ↓ handoff 04
+F1–F13 (Coder)
+    ↓ handoff 05
+G1–G6 (Reviewer)
+    ↓ handoff 06
+H1–H6 (QA & Deploy)
 ```
+
+D4 (прод-деплой) остаётся `blocked`: нужен запущенный Docker или доступ к VPS.
 
 ## Definition of Done продукта (MVP)
 
