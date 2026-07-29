@@ -87,6 +87,8 @@ class CrawlRequest(BaseModel):
 
 
 class EnrichRequest(BaseModel):
+    # если задан, обогащается ровно это учреждение, остальные фильтры игнорируются
+    institution_id: str | None = None
     limit: int = Field(default=25, ge=1, le=500)
     only_missing_chief: bool = True
     region: str | None = None

@@ -13,7 +13,7 @@ from urllib.robotparser import RobotFileParser
 import httpx
 from bs4 import BeautifulSoup
 
-from app.services.collectors.base import classify_network_error, http_client, rate_sleep
+from app.services.collectors.base import BOT_UA, classify_network_error, http_client, rate_sleep
 from app.services.collectors.person_extractor import page_kind
 
 LEAD_LINK = re.compile(
@@ -33,6 +33,9 @@ SKIP_LINK = re.compile(
 
 MAX_PAGES = 12
 MAX_DEPTH = 2
+# Страницами считаются только успешные ответы, поэтому на сайте, где половина ссылок
+# отдаёт 404, обход без этого лимита уходит в сотни запросов к чужому домену.
+MAX_FETCHES = 30
 PRIORITY = {"leadership": 0, "contacts": 1, "departments": 2, "other": 3}
 # короткий таймаут: мёртвый домен не должен съедать минуту на ретраях
 PAGE_TIMEOUT = 12.0
@@ -66,7 +69,8 @@ def _robots(base: str) -> RobotFileParser | None:
     return parser
 
 
-def robots_allows(url: str, user_agent: str = "PerinatalContactsBot") -> bool:
+def robots_allows(url: str, user_agent: str = BOT_UA) -> bool:
+    """Проверять разрешение тем же User-Agent, который уходит в запросах."""
     parser = _robots(url)
     if parser is None:
         return True
@@ -162,8 +166,9 @@ def find_pages(website: str, max_pages: int = MAX_PAGES) -> tuple[list[FetchedPa
     queue: list[tuple[int, str]] = [(0, root)]
     root_error: str | None = None
 
+    fetches = 0
     with _Fetcher() as fetcher:
-        while queue and len(pages) < max_pages:
+        while queue and len(pages) < max_pages and fetches < MAX_FETCHES:
             queue.sort(key=lambda item: (item[0], PRIORITY.get(page_kind(item[1]), 3)))
             depth, url = queue.pop(0)
             if url in visited or depth > MAX_DEPTH:
@@ -173,6 +178,7 @@ def find_pages(website: str, max_pages: int = MAX_PAGES) -> tuple[list[FetchedPa
                 continue
 
             resp = fetcher.get(url)
+            fetches += 1
             rate_sleep()
             if resp is None:
                 if url == root:

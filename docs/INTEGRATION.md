@@ -72,6 +72,11 @@ curl -X POST http://localhost:8000/api/v1/admin/jobs/enrich \
   -H 'X-API-Key: YOUR_KEY' -H 'Content-Type: application/json' \
   -d '{"limit":25,"only_missing_chief":true,"with_site_only":true}'
 
+# Обогащение одного учреждения (institution_id отменяет остальные фильтры)
+curl -X POST http://localhost:8000/api/v1/admin/jobs/enrich \
+  -H 'X-API-Key: YOUR_KEY' -H 'Content-Type: application/json' \
+  -d '{"institution_id":"UUID","force":true}'
+
 # Метрики полноты
 curl -H 'X-API-Key: YOUR_KEY' http://localhost:8000/api/v1/admin/metrics/completeness
 
@@ -91,6 +96,7 @@ curl -X PATCH -H 'X-API-Key: YOUR_KEY' -H 'Content-Type: application/json' \
 ```bash
 python3 scripts/enrich.py --limit 100 --with-site-only --verbose
 python3 scripts/enrich.py --region "Москва" --force
+python3 scripts/enrich.py --id UUID --force  # одно учреждение
 python3 scripts/enrich.py --report          # только метрики, без обхода
 ```
 

@@ -219,6 +219,47 @@ def test_enrich_job_is_recorded(client):
     assert client.get(f"/api/v1/admin/jobs/{job['id']}", headers={"X-API-Key": "test-key"}).status_code == 200
 
 
+def test_enrich_by_institution_id_targets_exactly_that_row(client, monkeypatch):
+    """Кнопка «обогатить это учреждение» не должна обходить чужой сайт."""
+    from app.services import enrich as enrich_module
+
+    items = client.get("/api/v1/institutions", params={"region": "Москва", "page_size": 5}).json()["items"]
+    target = items[-1]
+    processed: list[str] = []
+
+    def fake_enrich(db, inst, *, force=False):
+        processed.append(inst.id)
+        return {"id": inst.id, "name": inst.name, "status": "ok", "persons": 0}
+
+    monkeypatch.setattr(enrich_module, "enrich_institution", fake_enrich)
+    r = client.post(
+        "/api/v1/admin/jobs/enrich",
+        # регион и лимит намеренно противоречат адресному запуску
+        json={"institution_id": target["id"], "region": "Другой регион", "limit": 25, "force": True},
+        headers={"X-API-Key": "test-key"},
+    )
+    assert r.status_code == 202
+    assert r.json()["result_json"]["processed"] == 1
+    assert processed == [target["id"]]
+
+
+def test_enrich_keeps_better_stored_chief(client):
+    """Повторный обход, нашедший только medium-кандидата, не затирает high из БД."""
+    from app.db import SessionLocal
+    from app.models import Institution
+    from app.services.enrich import sync_institution_fields
+
+    inst = client.get("/api/v1/institutions?page_size=1").json()["items"][0]
+    _add_person(inst["id"], "Достоверный Кандидат Иванович", "chief", "high")
+    _add_person(inst["id"], "Сомнительный Кандидат Петрович", "chief", "medium")
+
+    with SessionLocal() as db:
+        row = db.get(Institution, inst["id"])
+        sync_institution_fields(db, row)
+        db.commit()
+        assert row.chief_physician == "Достоверный Кандидат Иванович"
+
+
 def test_export_has_persons_sheet(client):
     from openpyxl import load_workbook
 

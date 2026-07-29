@@ -26,7 +26,7 @@ from app.schemas import (
 from app.services.collectors.html_generic import fetch_and_parse
 from app.services.collectors.person_extractor import normalize_person_name
 from app.services.crawl_runner import run_crawl
-from app.services.enrich import run_enrichment
+from app.services.enrich import run_enrichment, sync_institution_fields
 from app.services.export import run_export_job
 from app.services.mailing import preview_mailing, run_mailing
 from app.services.metrics import build_completeness
@@ -130,6 +130,7 @@ def enrich(body: EnrichRequest, db: Session = Depends(get_db)) -> JobOut:
     try:
         job.result_json = run_enrichment(
             db,
+            institution_id=body.institution_id,
             limit=body.limit,
             only_missing_chief=body.only_missing_chief,
             region=body.region,
@@ -213,15 +214,7 @@ def _sync_institution_fields(db: Session, institution_id: str) -> None:
     inst = db.get(Institution, institution_id)
     if not inst:
         return
-    persons = db.scalars(
-        select(InstitutionPerson).where(InstitutionPerson.institution_id == institution_id)
-    ).all()
-    for field, role in (("chief_physician", "chief"), ("pathology_head", "pathology_head")):
-        candidates = sorted(
-            (p for p in persons if p.role == role and p.confidence in {"high", "medium"}),
-            key=lambda p: (0 if p.verified_manually else 1, 0 if p.confidence == "high" else 1),
-        )
-        setattr(inst, field, candidates[0].full_name if candidates else None)
+    sync_institution_fields(db, inst, clear_missing=True)
     db.commit()
 
 

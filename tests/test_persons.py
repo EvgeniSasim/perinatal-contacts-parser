@@ -157,6 +157,60 @@ def test_too_many_chiefs_on_page_are_demoted():
     assert pick_field_values(persons)["chief_physician"] is None
 
 
+def test_role_in_sibling_label_definition_list():
+    """Должность в dt, ФИО в dd — самая частая разметка контактов."""
+    html = """
+    <dl>
+      <dt>Главный врач</dt><dd>Ниманихина Алла Владимировна</dd>
+      <dt>Заведующий отделением патологии беременности</dt><dd>Петрова Анна Ивановна</dd>
+    </dl>
+    """
+    persons = extract_persons(html, "https://example.com/contact", kind="contacts")
+    by_role = {p.role: p.full_name for p in persons}
+    assert by_role["chief"] == "Ниманихина Алла Владимировна"
+    assert by_role["pathology_head"] == "Петрова Анна Ивановна"
+
+
+def test_role_in_sibling_label_heading():
+    html = "<div><h3>Главный врач</h3><p>Соколова Елена Юрьевна</p></div>"
+    persons = extract_persons(html, "https://example.com/rukovodstvo", kind="leadership")
+    assert persons and persons[0].role == "chief"
+    assert persons[0].confidence == "high"
+
+
+def test_sibling_label_with_own_fio_is_not_reused():
+    """Список ФИО подряд: должность первого не должна распространиться на остальных."""
+    html = """
+    <div>
+      <h3>Главный врач</h3>
+      <p>Соколова Елена Юрьевна</p>
+      <p>Кузнецова Мария Ивановна</p>
+    </div>
+    """
+    persons = extract_persons(html, "https://example.com/rukovodstvo", kind="leadership")
+    assert [p.full_name for p in persons] == ["Соколова Елена Юрьевна"]
+
+
+def test_sibling_label_does_not_bypass_director_trap():
+    html = "<dl><dt>Директор страховой компании</dt><dd>Кузнецова Иннеса Юрьевна</dd></dl>"
+    assert extract_persons(html, "https://example.com/contact", kind="contacts") == []
+
+
+def test_genitive_fio_is_not_promoted_to_field():
+    """«Прием главного врача А.В. Ниманихиной» — форма косвенная, в поле не годится."""
+    html = "<p>Прием главного врача А.В. Ниманихиной по личным вопросам</p>"
+    persons = extract_persons(html, "https://example.com/priem-administraciey", kind="leadership")
+    assert persons and persons[0].confidence == "low"
+    assert pick_field_values(persons)["chief_physician"] is None
+    # именительная форма на той же должности остаётся пригодной
+    nominative = extract_persons(
+        "<p>Главный врач Ниманихина Алла Владимировна</p>",
+        "https://example.com/contact",
+        kind="contacts",
+    )
+    assert pick_field_values(nominative)["chief_physician"] == "Ниманихина Алла Владимировна"
+
+
 def test_eponym_initials_are_not_a_person():
     """«ГКБ им. С.П. Боткина» — не ФИО заместителя."""
     html = "<p>Заместитель директора ГКБ им. С.П. Боткина</p>"
@@ -196,6 +250,32 @@ def test_mailing_template_degrades_without_chief():
     inst = _FakeInstitution()
     inst.chief_physician = None
     assert render_template("Уважаемый(ая) {{chief}}!", inst) == "Уважаемый(ая) коллега!"
+
+
+def test_mailing_html_escapes_substituted_values():
+    """Название учреждения приходит с чужого сайта — разметка в нём не должна исполняться."""
+    inst = _FakeInstitution()
+    inst.name = '<img src=x onerror="alert(1)">Роддом «Тест»'
+    rendered = render_template("<p>{{name}}</p>", inst, html=True)
+    assert "<img" not in rendered
+    assert "&lt;img" in rendered
+    # в теме письма экранирование не нужно — это plain text
+    assert "<img" in render_template("{{name}}", inst)
+
+
+def test_robots_is_checked_with_request_user_agent():
+    from urllib.robotparser import RobotFileParser
+
+    from app.services.collectors import page_finder
+
+    parser = RobotFileParser()
+    parser.parse(["User-agent: PerinatalContactsBot", "Disallow: /rukovodstvo"])
+    page_finder._robots_cache["https://example.com"] = parser
+    try:
+        assert not page_finder.robots_allows("https://example.com/rukovodstvo")
+        assert page_finder.robots_allows("https://example.com/kontakty")
+    finally:
+        page_finder._robots_cache.pop("https://example.com", None)
 
 
 def test_extract_from_real_fixture():

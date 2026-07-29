@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import Iterable
 from urllib.parse import unquote
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup, Comment, Tag
 
 FIO_FULL = re.compile(
     r"\b([А-ЯЁ][а-яё]+(?:-[А-ЯЁ][а-яё]+)?)\s+([А-ЯЁ][а-яё]+)\s+"
@@ -62,6 +62,11 @@ NOISE = re.compile(
 # «ГКБ им. С.П. Боткина» — инициалы в названии учреждения, а не ФИО руководителя
 EPONYM = re.compile(r"(им\.|имени)\s*$", re.I)
 
+# «Прием главного врача А.В. Ниманихиной»: должность в родительном падеже — значит и ФИО
+# тоже, а в поле нужна именительная форма. Такая запись остаётся в персонах, но с low.
+GENITIVE_ROLE = re.compile(r"главн(?:ого|ому|ым)\s+врач|заведующ(?:его|ему)|заместител(?:я|ю)", re.I)
+OBLIQUE_SURNAME = re.compile(r"(ой|ого|ому|ым|ых|ей|ых)$", re.I)
+
 BLOCK_TAGS = ("tr", "li", "td", "th", "p", "dd", "dt", "h1", "h2", "h3", "h4", "h5", "figcaption")
 CARD_TAGS = ("div", "article", "section", "span", "strong", "b", "em")
 
@@ -69,6 +74,13 @@ PHONE_IN_BLOCK = re.compile(r"(?:\+7|8|7)?[\s(-]*\d{3,5}[\s)-]*\d{2,3}[\s-]?\d{2
 EMAIL_IN_BLOCK = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 
 MAX_BLOCK_LEN = 400
+# Должность в подписи, ФИО в соседнем блоке: «<dt>Главный врач</dt><dd>Иванова А.В.</dd>»,
+# «<th>Заведующий</th><td>…</td>», «<h3>Руководство</h3>» + карточка. Оба блока должны быть
+# короткими, иначе это не пара, а разные части страницы.
+MAX_LABEL_LEN = 120
+MAX_LABELED_BLOCK_LEN = 120
+MAX_SIBLINGS_LOOKBACK = 3
+
 LEADERSHIP_PAGE_KINDS = {"leadership"}
 MEDIUM_PAGE_KINDS = {"contacts", "departments"}
 
@@ -162,6 +174,43 @@ def _clean(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def _label_role(tag: Tag) -> tuple[tuple[str, str | None], str] | None:
+    """Найти должность в ближайшей предыдущей подписи-соседе.
+
+    Разметка контактов часто разносит должность и ФИО по соседним элементам, и тогда
+    внутри одного блока их не связать: `dl` не сканируется как блок намеренно, иначе
+    «Главный врач: X» и «Заместитель: Y» в одном `dl` дадут перепутанные роли.
+
+    Учитывается только ближайший непустой сосед: если в нём нет должности, связывать
+    ФИО не с чем.
+    """
+    seen = 0
+    for sibling in tag.previous_siblings:
+        if isinstance(sibling, Comment):
+            continue
+        if isinstance(sibling, Tag):
+            text = _clean(sibling.get_text(" ", strip=True))
+        else:
+            text = _clean(str(sibling))
+        if not text:
+            seen += 1
+            if seen > MAX_SIBLINGS_LOOKBACK:
+                return None
+            continue
+        if len(text) > MAX_LABEL_LEN or _match_fio(text):
+            # подпись с чужим ФИО — это соседняя персона, а не должность нашей
+            return None
+        detected = detect_role(text)
+        return (detected, text) if detected else None
+    return None
+
+
+def _is_oblique(fio: str, context: str) -> bool:
+    """ФИО в косвенном падеже — в поле такую форму пускать нельзя."""
+    surname = fio.split()[0]
+    return bool(GENITIVE_ROLE.search(context) and OBLIQUE_SURNAME.search(surname))
+
+
 def _extract_department(text: str, role: str) -> str | None:
     if role not in {"head", "pathology_head"}:
         return None
@@ -192,26 +241,37 @@ def extract_persons(html: str, source_url: str, kind: str | None = None) -> list
         fio = _match_fio(text)
         if not fio:
             continue
+        context = text
         detected = detect_role(text)
         if not detected:
-            continue
+            if len(text) > MAX_LABELED_BLOCK_LEN or NOISE.search(text):
+                continue
+            labeled = _label_role(tag)
+            if labeled is None:
+                continue
+            detected, label = labeled
+            context = f"{label} {text}"
         role, position = detected
-        if role == "chief" and CHIEF_TRAPS.search(text):
+        if role == "chief" and CHIEF_TRAPS.search(context):
+            continue
+        if role == "chief" and "директор" in (position or "").lower() and DIRECTOR_TRAPS.search(context):
             continue
 
-        phone_m = PHONE_IN_BLOCK.search(text)
-        email_m = EMAIL_IN_BLOCK.search(text)
+        phone_m = PHONE_IN_BLOCK.search(context)
+        email_m = EMAIL_IN_BLOCK.search(context)
         person = ExtractedPerson(
             full_name=fio,
             role=role,
             position_raw=_clean(position)[:512] if position else None,
-            department=_extract_department(text, role),
+            department=_extract_department(context, role),
             phone=_clean(phone_m.group(0)) if phone_m else None,
             email=email_m.group(0).lower() if email_m else None,
             confidence=_confidence_for(kind, True),
             source_url=source_url,
             _depth=_depth(tag),
         )
+        if _is_oblique(fio, context):
+            person.confidence = "low"
         key = (normalize_person_name(fio), role)
         current = best.get(key)
         if current is None or person._depth > current._depth:

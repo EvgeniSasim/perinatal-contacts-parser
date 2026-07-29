@@ -44,6 +44,7 @@ def print_report(db) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--limit", type=int, default=25)
+    parser.add_argument("--id", dest="institution_id", help="обогатить одно учреждение по id")
     parser.add_argument("--region")
     parser.add_argument("--type", dest="type_")
     parser.add_argument("--with-site-only", action="store_true", help="только те, у кого уже есть сайт")
@@ -69,6 +70,7 @@ def main() -> int:
 
         summary = run_enrichment(
             db,
+            institution_id=args.institution_id,
             limit=args.limit,
             only_missing_chief=not args.all,
             region=args.region,

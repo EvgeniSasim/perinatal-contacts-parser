@@ -146,6 +146,10 @@ paths:
             schema:
               type: object
               properties:
+                institution_id:
+                  type: string
+                  nullable: true
+                  description: обогатить ровно это учреждение; прочие фильтры игнорируются
                 limit: { type: integer, default: 25, minimum: 1, maximum: 500 }
                 only_missing_chief: { type: boolean, default: true }
                 region: { type: string, nullable: true }
@@ -154,6 +158,10 @@ paths:
                   type: boolean
                   default: false
                   description: только учреждения с уже известным сайтом
+                without_site_only:
+                  type: boolean
+                  default: false
+                  description: только учреждения без известного сайта
                 force:
                   type: boolean
                   default: false

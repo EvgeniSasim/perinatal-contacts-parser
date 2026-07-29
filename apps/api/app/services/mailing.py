@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from html import escape
 
 from sqlalchemy.orm import Session
 
@@ -11,11 +12,15 @@ from app.services.query import query_institutions
 PLACEHOLDER = re.compile(r"\{\{\s*(name|city|region|chief|address)\s*\}\}")
 
 
-def render_template(text: str, inst: Institution) -> str:
+def render_template(text: str, inst: Institution, *, html: bool = False) -> str:
     """Подставить данные учреждения в шаблон.
 
     Обращение по ФИО главврача — основной смысл обогащения v0.2: письмо «Уважаемый
     Иван Иванович» вместо безличного. Если ФИО нет, обращение деградирует корректно.
+
+    `html=True` экранирует подставляемые значения: они пришли с чужих сайтов, и
+    кавычки в названии учреждения не должны ломать вёрстку письма, а разметка в них —
+    исполняться в предпросмотре у оператора.
     """
     values = {
         "name": inst.name,
@@ -25,6 +30,8 @@ def render_template(text: str, inst: Institution) -> str:
         "chief": inst.chief_physician or "коллега",
         "address": inst.address,
     }
+    if html:
+        values = {key: escape(value or "") for key, value in values.items()}
     return PLACEHOLDER.sub(lambda m: values.get(m.group(1), ""), text)
 
 
@@ -94,7 +101,7 @@ def preview_mailing(db: Session, subject: str, body_html: str, filter_json: dict
             {
                 "email": item["email"],
                 "subject": render_template(subject, inst),
-                "body_html": render_template(body_html, inst),
+                "body_html": render_template(body_html, inst, html=True),
                 "personalized": bool(inst.chief_physician),
             }
         )

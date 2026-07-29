@@ -319,11 +319,10 @@ $("enrichBtn").onclick = async () => {
 $("enrichOneBtn").onclick = async () => {
   if (!currentId) return;
   try {
-    const item = await api(`/api/v1/institutions/${currentId}`);
     const job = await api("/api/v1/admin/jobs/enrich", {
       method: "POST",
       auth: true,
-      body: JSON.stringify({ limit: 1, only_missing_chief: false, region: item.region, force: true }),
+      body: JSON.stringify({ institution_id: currentId, force: true }),
     });
     alert(job.status === "done" ? JSON.stringify(job.result_json.items?.[0] || {}, null, 2) : `Ошибка: ${job.error}`);
     await showCard(await api(`/api/v1/institutions/${currentId}`));

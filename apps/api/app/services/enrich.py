@@ -20,7 +20,6 @@ from app.services.collectors.person_extractor import (
     ExtractedPerson,
     extract_persons,
     normalize_person_name,
-    pick_field_values,
 )
 from app.services.collectors.site_discovery import discover_site, verify_site
 from app.services.normalize import normalize_email, normalize_phone
@@ -260,32 +259,57 @@ def enrich_institution(db: Session, inst: Institution, *, force: bool = False) -
         found_count=result["emails_added"],
     )
 
-    fields = pick_field_values(all_persons)
-    if fields["chief_physician"] and not _is_manually_verified(db, inst.id, "chief"):
-        inst.chief_physician = fields["chief_physician"]
-    if fields["pathology_head"] and not _is_manually_verified(db, inst.id, "pathology_head"):
-        inst.pathology_head = fields["pathology_head"]
+    sync_institution_fields(db, inst)
     result["chief"] = inst.chief_physician
     result["pathology_head"] = inst.pathology_head
     return result
 
 
-def _is_manually_verified(db: Session, institution_id: str, role: str) -> bool:
-    stmt = (
-        select(func.count())
-        .select_from(InstitutionPerson)
-        .where(
-            InstitutionPerson.institution_id == institution_id,
-            InstitutionPerson.role == role,
-            InstitutionPerson.verified_manually.is_(True),
+PERSON_FIELD_ROLES = {"chief_physician": "chief", "pathology_head": "pathology_head"}
+PREGNANCY = re.compile(r"беременн", re.I)
+
+
+def sync_institution_fields(db: Session, inst: Institution, *, clear_missing: bool = False) -> None:
+    """Пересчитать денормализованные ФИО из сохранённых персон учреждения.
+
+    Считать только по персонам текущего обхода нельзя: повторный запуск, зацепивший
+    лишь страницу контактов, затёр бы более достоверную запись со страницы руководства.
+    Подтверждённая вручную персона всегда побеждает — это правка оператора.
+
+    `clear_missing=True` нужен после правок персон в админке: поле должно точно
+    отражать их список. При обходе сайта поле не чистится — значение могло прийти из
+    seed-каталога, а не из персон.
+    """
+    for field_name, role in PERSON_FIELD_ROLES.items():
+        rows = list(
+            db.execute(
+                select(InstitutionPerson).where(
+                    InstitutionPerson.institution_id == inst.id,
+                    InstitutionPerson.role == role,
+                    InstitutionPerson.confidence.in_(("high", "medium")),
+                )
+            ).scalars()
         )
-    )
-    return bool(db.execute(stmt).scalar_one())
+        if not rows:
+            if clear_missing:
+                setattr(inst, field_name, None)
+            continue
+        rows.sort(
+            key=lambda p: (
+                0 if p.verified_manually else 1,
+                -CONFIDENCE_RANK[p.confidence],
+                # среди «патологий» приоритет у отделения патологии беременности
+                0 if PREGNANCY.search(p.department or "") else 1,
+                p.full_name,
+            )
+        )
+        setattr(inst, field_name, rows[0].full_name)
 
 
 def run_enrichment(
     db: Session,
     *,
+    institution_id: str | None = None,
     limit: int = 25,
     only_missing_chief: bool = True,
     region: str | None = None,
@@ -295,19 +319,23 @@ def run_enrichment(
     force: bool = False,
     progress: Callable[[int, int, dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
-    stmt = select(Institution).where(Institution.verification_status != "rejected")
-    if only_missing_chief:
-        stmt = stmt.where(Institution.chief_physician.is_(None))
-    if region:
-        stmt = stmt.where(Institution.region == region)
-    if type_:
-        stmt = stmt.where(Institution.type == type_)
-    if with_site_only:
-        stmt = stmt.where(Institution.website.is_not(None), Institution.website != "")
-    if without_site_only:
-        stmt = stmt.where(or_(Institution.website.is_(None), Institution.website == ""))
-    # сначала те, у кого сайт уже известен — там выше отдача
-    stmt = stmt.order_by(Institution.website.is_(None), Institution.name).limit(limit)
+    if institution_id:
+        # адресный запуск из карточки: прочие фильтры не должны подменить учреждение
+        stmt = select(Institution).where(Institution.id == institution_id)
+    else:
+        stmt = select(Institution).where(Institution.verification_status != "rejected")
+        if only_missing_chief:
+            stmt = stmt.where(Institution.chief_physician.is_(None))
+        if region:
+            stmt = stmt.where(Institution.region == region)
+        if type_:
+            stmt = stmt.where(Institution.type == type_)
+        if with_site_only:
+            stmt = stmt.where(Institution.website.is_not(None), Institution.website != "")
+        if without_site_only:
+            stmt = stmt.where(or_(Institution.website.is_(None), Institution.website == ""))
+        # сначала те, у кого сайт уже известен — там выше отдача
+        stmt = stmt.order_by(Institution.website.is_(None), Institution.name).limit(limit)
 
     institutions = list(db.execute(stmt).scalars())
     items: list[dict[str, Any]] = []
